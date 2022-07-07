@@ -1,0 +1,54 @@
+name: Update
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron:  '0 0 * * SUN' # every sunday
+
+jobs:
+  update:
+    name: Pull in judge source code from scnu-socoding/scnuoj
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Procure Nix
+      uses: cachix/install-nix-action@v13
+      with:
+        nix_path: nixpkgs=channel:nixos-unstable
+
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        ref: master
+        path: scnuoj-judge
+
+    - name: Checkout scnuoj repo
+      uses: actions/checkout@v2
+      with:
+        ref: master
+        repository: scnu-socoding/scnuoj
+        path: scnuoj
+        fetch-depth: 0
+
+    - name: Install git-filter-repo from nixpkgs
+      run: "nix-env -i git-filter-repo -f '<nixpkgs>'"
+
+    - name: Filter scnuoj on ./judge
+      run: |
+        cd ./scnuoj
+        git filter-repo --path judge --force
+
+    - name: Update scnuoj-judge
+      run: |
+        cd ./scnuoj-judge
+        git remote add upstream ../scnuoj/
+        git fetch upstream master
+        git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git merge -X theirs --allow-unrelated-histories upstream/master
+    - name: Push changes
+      uses: ad-m/github-push-action@master
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        directory: scnuoj-judge
+        branch: master
